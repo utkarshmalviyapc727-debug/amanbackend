@@ -33,7 +33,6 @@ app.post('/api/users/sync', async (req, res) => {
     }
 });
 
-// Update User Profile
 app.post('/api/users/update', async (req, res) => {
     const { firebaseUid, name, dob, studentUid, contact } = req.body;
     try {
@@ -49,7 +48,6 @@ app.post('/api/users/update', async (req, res) => {
     }
 });
 
-// Get User Profile
 app.get('/api/users/:firebaseUid', async (req, res) => {
     try {
         const user = await User.findOne({ firebaseUid: req.params.firebaseUid });
@@ -62,10 +60,18 @@ app.get('/api/users/:firebaseUid', async (req, res) => {
 
 // --- ORDER ROUTES ---
 
-// Create a new order
 app.post('/api/orders', async (req, res) => {
     try {
         const { firebaseUid, items, totalPrice, userInfo } = req.body;
+
+        // Check if user is banned
+        const user = await User.findOne({ firebaseUid });
+        if (user && user.banUntil && user.banUntil > new Date()) {
+            return res.status(403).json({
+                error: 'You are banned from ordering until ' + user.banUntil.toLocaleDateString()
+            });
+        }
+
         const newOrder = new Order({
             firebaseUid,
             items,
@@ -79,29 +85,47 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
-// Update order status (New Route for Cancelling)
 app.post('/api/orders/status', async (req, res) => {
     try {
         const { orderId, status } = req.body;
-        const updatedOrder = await Order.findByIdAndUpdate(
-            orderId,
-            { status },
-            { new: true }
-        );
-        if (!updatedOrder) {
-            return res.status(404).json({ error: 'Order not found' });
+        const order = await Order.findById(orderId);
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+
+        const oldStatus = order.status;
+        order.status = status;
+        await order.save();
+
+        // Ban logic: if status changed to Cancelled
+        if (status === 'Cancelled' && oldStatus !== 'Cancelled') {
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const cancelledToday = await Order.countDocuments({
+                firebaseUid: order.firebaseUid,
+                status: 'Cancelled',
+                createdAt: { $gte: startOfDay }
+            });
+
+            if (cancelledToday > 3) {
+                const banDate = new Date();
+                banDate.setDate(banDate.getDate() + 7);
+                await User.findOneAndUpdate(
+                    { firebaseUid: order.firebaseUid },
+                    { banUntil: banDate }
+                );
+            }
         }
-        res.status(200).json({ message: 'Status updated', order: updatedOrder });
+
+        res.status(200).json({ message: 'Status updated', order });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Get order history for a user (Sorted by newest first)
 app.get('/api/orders/:firebaseUid', async (req, res) => {
     try {
         const orders = await Order.find({ firebaseUid: req.params.firebaseUid })
-                                  .sort({ createdAt: -1 }); // Recent on top
+                                  .sort({ createdAt: -1 });
         res.status(200).json(orders);
     } catch (error) {
         res.status(500).json({ error: error.message });
