@@ -33,15 +33,15 @@ app.post('/api/users/sync', async (req, res) => {
     }
 });
 
+// Update User Profile (Added upsert: true to prevent 404)
 app.post('/api/users/update', async (req, res) => {
     const { firebaseUid, name, dob, studentUid, contact } = req.body;
     try {
         let user = await User.findOneAndUpdate(
             { firebaseUid },
             { name, dob, studentUid, contact },
-            { new: true }
+            { upsert: true, new: true }
         );
-        if (!user) return res.status(404).json({ error: 'User not found' });
         res.status(200).json({ message: 'Profile updated', user });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -60,6 +60,7 @@ app.get('/api/users/:firebaseUid', async (req, res) => {
 
 // --- ORDER ROUTES ---
 
+// Create a new order
 app.post('/api/orders', async (req, res) => {
     try {
         const { firebaseUid, items, totalPrice, userInfo } = req.body;
@@ -79,6 +80,17 @@ app.post('/api/orders', async (req, res) => {
             userInfo
         });
         await newOrder.save();
+
+        // Auto-complete order after 30 minutes (simulating delivery)
+        setTimeout(async () => {
+            try {
+                await Order.findByIdAndUpdate(newOrder._id, { status: 'Delivered' });
+                console.log(`Order ${newOrder._id} auto-delivered.`);
+            } catch (err) {
+                console.error("Auto-delivery failed:", err);
+            }
+        }, 30 * 60 * 1000);
+
         res.status(201).json({ message: 'Order placed successfully', order: newOrder });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -122,6 +134,7 @@ app.post('/api/orders/status', async (req, res) => {
     }
 });
 
+// Get order history for a user
 app.get('/api/orders/:firebaseUid', async (req, res) => {
     try {
         const orders = await Order.find({ firebaseUid: req.params.firebaseUid })
