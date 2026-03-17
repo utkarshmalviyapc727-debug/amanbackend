@@ -1,4 +1,4 @@
- const express = require('express');
+const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -28,6 +28,33 @@ app.post('/api/users/sync', async (req, res) => {
             { upsert: true, new: true }
         );
         res.status(200).json({ message: 'User synced', user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update User Profile
+app.post('/api/users/update', async (req, res) => {
+    const { firebaseUid, name, dob, studentUid, contact } = req.body;
+    try {
+        let user = await User.findOneAndUpdate(
+            { firebaseUid },
+            { name, dob, studentUid, contact },
+            { new: true }
+        );
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.status(200).json({ message: 'Profile updated', user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get User Profile
+app.get('/api/users/:firebaseUid', async (req, res) => {
+    try {
+        const user = await User.findOne({ firebaseUid: req.params.firebaseUid });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.status(200).json(user);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
