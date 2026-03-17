@@ -7,7 +7,8 @@ const userSchema = new mongoose.Schema({
     dob: { type: String, default: "" },
     studentUid: { type: String, default: "" },
     contact: { type: String, default: "" },
+    banUntil: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);
