@@ -1,10 +1,14 @@
 const mongoose = require('mongoose');
-const orderSchema = new mongoose.Schema({
-    firebaseUid: { type: String, required: true },
-    items: [{ name: String, price: Number, quantity: Number }],
-    totalPrice: { type: Number, required: true },
-    status: { type: String, default: 'Pending' },
-    userInfo: { name: String, address: String, phone: String },
+
+const userSchema = new mongoose.Schema({
+    firebaseUid: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true },
+    name: { type: String, default: "" },
+    dob: { type: String, default: "" },
+    studentUid: { type: String, default: "" },
+    contact: { type: String, default: "" },
+    banUntil: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now }
 });
-module.exports = mongoose.model('Order', orderSchema);
+
+module.exports = mongoose.model('User', userSchema);
